@@ -47,32 +47,22 @@ Title.Position = UDim2.new(0, 5, 0, 5)
 Title.BackgroundTransparency = 1
 Title.Parent = MainFrame
 
--- Выбор магазина
-local StoreLabel = Instance.new("TextLabel")
-StoreLabel.Text = "Магазин:"
-StoreLabel.Font = Enum.Font.SourceSans
-StoreLabel.TextSize = 16
-StoreLabel.TextColor3 = Color3.new(0.9, 0.9, 0.9)
-StoreLabel.Size = UDim2.new(0.9, 0, 0, 20)
-StoreLabel.Position = UDim2.new(0.05, 0, 0.15, 0)
-StoreLabel.BackgroundTransparency = 1
-StoreLabel.Parent = MainFrame
+-- Кнопка настройки
+local SetupButton = Instance.new("TextButton")
+SetupButton.Name = "SetupButton"
+SetupButton.Text = "Настроить магазины"
+SetupButton.Font = Enum.Font.SourceSansSemibold
+SetupButton.TextSize = 16
+SetupButton.TextColor3 = Color3.new(1, 1, 1)
+SetupButton.Size = UDim2.new(0.9, 0, 0, 35)
+SetupButton.Position = UDim2.new(0.05, 0, 0.15, 0)
+SetupButton.BackgroundColor3 = Color3.fromRGB(100, 100, 150)
+SetupButton.AutoButtonColor = true
+SetupButton.Parent = MainFrame
 
-local StoreDropdown = Instance.new("TextButton")
-StoreDropdown.Name = "StoreDropdown"
-StoreDropdown.Text = "Все магазины"
-StoreDropdown.Font = Enum.Font.SourceSansSemibold
-StoreDropdown.TextSize = 16
-StoreDropdown.TextColor3 = Color3.new(1, 1, 1)
-StoreDropdown.Size = UDim2.new(0.9, 0, 0, 30)
-StoreDropdown.Position = UDim2.new(0.05, 0, 0.2, 0)
-StoreDropdown.BackgroundColor3 = Color3.fromRGB(70, 70, 90)
-StoreDropdown.AutoButtonColor = true
-StoreDropdown.Parent = MainFrame
-
-local UICornerDropdown = Instance.new("UICorner")
-UICornerDropdown.CornerRadius = UDim.new(0, 6)
-UICornerDropdown.Parent = StoreDropdown
+local UICornerSetup = Instance.new("UICorner")
+UICornerSetup.CornerRadius = UDim.new(0, 6)
+UICornerSetup.Parent = SetupButton
 
 -- Выбор предмета
 local ItemLabel = Instance.new("TextLabel")
@@ -185,19 +175,21 @@ ProgressLabel.Parent = MainFrame
 
 -- Переменные
 local stores = {
-    {Name = "WoodRUs", NPC = "Thom", SampleItem = "BasicHatchet"},
-    {Name = "CarStore", NPC = "Jenny", SampleItem = "Pickup1"},
-    {Name = "FineArt", NPC = "Timothy", SampleItem = "Painting3"},
-    {Name = "FurnitureStore", NPC = "Corey", SampleItem = "LightBulb"},
-    {Name = "LogicStore", NPC = "Lincoln", SampleItem = "NeonWireOrange"},
-    {Name = "ShackShop", NPC = "Bob", SampleItem = "Dynamite"}
+    {Name = "WoodRUs", NPC = "Thom", SampleItem = "BasicHatchet", Configured = false},
+    {Name = "CarStore", NPC = "Jenny", SampleItem = "Pickup1", Configured = false},
+    {Name = "FineArt", NPC = "Timothy", SampleItem = "Painting3", Configured = false},
+    {Name = "FurnitureStore", NPC = "Corey", SampleItem = "LightBulb", Configured = false},
+    {Name = "LogicStore", NPC = "Lincoln", SampleItem = "NeonWireOrange", Configured = false},
+    {Name = "ShackShop", NPC = "Bob", SampleItem = "Dynamite", Configured = false}
 }
 
 local allItems = {}
-local selectedStore = nil
 local selectedItem = nil
 local isRunning = false
 local stopRequested = false
+local isSettingUp = false
+local savedPosition = nil
+local currentSetupStore = nil
 
 -- Функции
 local function updateStatus(text, color)
@@ -209,121 +201,152 @@ local function updateProgress(current, total)
     ProgressLabel.Text = current.."/"..total
 end
 
--- Поиск стоек для покупки
-local function getStoreCounters()
-    local counters = {}
+-- Функция для подсветки предмета
+local function highlightItem(item, color)
+    if item:FindFirstChild("ItemHighlight") then
+        item.ItemHighlight:Destroy()
+    end
+    
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "ItemHighlight"
+    highlight.FillColor = color or Color3.fromRGB(0, 200, 100)
+    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    highlight.Parent = item
+end
+
+-- Функция для настройки магазинов
+local function setupStores()
+    if isSettingUp then return end
+    
+    local char = Player.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then
+        updateStatus("Персонаж не найден", Color3.fromRGB(255, 100, 100))
+        return
+    end
+    
+    savedPosition = char.HumanoidRootPart.Position
+    isSettingUp = true
+    SetupButton.Text = "Настройка..."
+    
+    -- Получаем список не настроенных магазинов
+    local unconfiguredStores = {}
     for _, store in ipairs(stores) do
-        local counter = workspace.Stores[store.Name]:FindFirstChild("Counter")
-        if counter then
-            counters[store.Name] = counter
+        if not store.Configured then
+            table.insert(unconfiguredStores, store)
         end
     end
-    return counters
-end
-
--- Улучшенный поиск предметов для покупки
-local function scanShopItems()
-    local items = {}
-    local itemNames = {}
     
-    -- Сканируем все магазины
-    for _, store in ipairs(stores) do
-        local storeFolder = workspace.Stores:FindFirstChild(store.Name)
-        if storeFolder then
-            -- Ищем папку ShopItems
-            local shopItems = storeFolder:FindFirstChild("ShopItems")
-            if not shopItems then
-                -- Если нет папки ShopItems, ищем BoxItemName в других местах
-                for _, child in ipairs(storeFolder:GetDescendants()) do
-                    if child.Name == "BoxItemName" and child:IsA("StringValue") then
-                        local box = child.Parent
-                        if box:IsA("Model") and not itemNames[child.Value] then
-                            table.insert(items, {
-                                Name = child.Value,
-                                Box = box,
-                                Store = store.Name
-                            })
-                            itemNames[child.Value] = true
-                        end
-                    end
-                end
-            else
-                -- Если есть папка ShopItems, ищем в ней
-                for _, box in ipairs(shopItems:GetDescendants()) do
-                    if box.Name == "BoxItemName" and box:IsA("StringValue") then
-                        local parentBox = box.Parent
-                        if parentBox:IsA("Model") and not itemNames[box.Value] then
-                            table.insert(items, {
-                                Name = box.Value,
-                                Box = parentBox,
-                                Store = store.Name
-                            })
-                            itemNames[box.Value] = true
-                        end
-                    end
-                end
+    if #unconfiguredStores == 0 then
+        updateStatus("Все магазины настроены!", Color3.fromRGB(0, 255, 0))
+        isSettingUp = false
+        SetupButton.Text = "Настроить магазины"
+        return
+    end
+    
+    -- Создаем меню выбора магазина для настройки
+    local dropdown = Instance.new("Frame")
+    dropdown.Name = "StoreSetupDropdown"
+    dropdown.Size = UDim2.new(0.9, 0, 0, math.min(200, #unconfiguredStores * 30 + 10))
+    dropdown.Position = UDim2.new(0.05, 0, 0.15, 30)
+    dropdown.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+    dropdown.Parent = MainFrame
+    
+    local dropdownCorner = Instance.new("UICorner")
+    dropdownCorner.CornerRadius = UDim.new(0, 6)
+    dropdownCorner.Parent = dropdown
+    
+    local scroll = Instance.new("ScrollingFrame")
+    scroll.Size = UDim2.new(1, -5, 1, -5)
+    scroll.Position = UDim2.new(0, 5, 0, 5)
+    scroll.BackgroundTransparency = 1
+    scroll.ScrollBarThickness = 5
+    scroll.Parent = dropdown
+    
+    local layout = Instance.new("UIListLayout")
+    layout.Parent = scroll
+    
+    -- Добавляем магазины
+    for _, store in ipairs(unconfiguredStores) do
+        local button = Instance.new("TextButton")
+        button.Text = store.Name
+        button.Size = UDim2.new(1, 0, 0, 30)
+        button.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
+        button.TextColor3 = Color3.new(1, 1, 1)
+        button.Font = Enum.Font.SourceSansSemibold
+        button.TextSize = 16
+        button.Parent = scroll
+        
+        local buttonCorner = Instance.new("UICorner")
+        buttonCorner.CornerRadius = UDim.new(0, 4)
+        buttonCorner.Parent = button
+        
+        button.MouseButton1Click:Connect(function()
+            currentSetupStore = store
+            dropdown:Destroy()
+            updateStatus("Нажмите на товар в магазине "..store.Name, Color3.fromRGB(255, 255, 150))
+        end)
+    end
+    
+    -- Закрытие при клике вне меню
+    local connection
+    connection = UserInputService.InputBegan:Connect(function(input, processed)
+        if not processed and input.UserInputType == Enum.UserInputType.MouseButton1 then
+            local mousePos = UserInputService:GetMouseLocation()
+            local absPos = dropdown.AbsolutePosition
+            local absSize = dropdown.AbsoluteSize
+            
+            if not (mousePos.X >= absPos.X and mousePos.X <= absPos.X + absSize.X and
+                   mousePos.Y >= absPos.Y and mousePos.Y <= absPos.Y + absSize.Y) then
+                dropdown:Destroy()
+                connection:Disconnect()
+                isSettingUp = false
+                SetupButton.Text = "Настроить магазины"
+                updateStatus("Настройка отменена", Color3.fromRGB(255, 150, 0))
             end
         end
-    end
-    
-    -- Дополнительный поиск на случай нестандартного расположения
-    if #items == 0 then
-        for _, store in ipairs(stores) do
-            local storeFolder = workspace.Stores:FindFirstChild(store.Name)
-            if storeFolder then
-                for _, child in ipairs(storeFolder:GetDescendants()) do
-                    if child.Name == "BoxItemName" and child:IsA("StringValue") and not itemNames[child.Value] then
-                        local box = child.Parent
-                        if box:IsA("Model") then
-                            table.insert(items, {
-                                Name = child.Value,
-                                Box = box,
-                                Store = store.Name
-                            })
-                            itemNames[child.Value] = true
-                        end
-                    end
-                end
-            end
-        end
-    end
-    
-    if #items == 0 then
-        updateStatus("Предметы не найдены!", Color3.fromRGB(255, 100, 100))
-    end
-    
-    return items
+    end)
 end
 
--- Заполнение списка магазинов
-local function populateStoreDropdown()
-    StoreDropdown.Text = "Все магазины"
-    selectedStore = nil
-end
-
--- Заполнение списка предметов
-local function populateItemDropdown()
-    ItemDropdown.Text = "Выберите предмет"
-    selectedItem = nil
+-- Обработчик клика по предмету при настройке
+local function handleSetupClick(target)
+    if not isSettingUp or not currentSetupStore then return end
     
-    allItems = scanShopItems()
-    
-    -- Если выбран магазин, фильтруем предметы
-    local filteredItems = {}
-    if selectedStore then
-        for _, item in ipairs(allItems) do
-            if item.Store == selectedStore then
-                table.insert(filteredItems, item)
+    -- Проверяем, что кликнули на предмет из текущего магазина
+    local item = target
+    while item and item ~= workspace do
+        if item:FindFirstChild("BoxItemName") and item:IsA("Model") then
+            -- Проверяем, что это предмет из нужного магазина
+            local storeFolder = item:FindFirstAncestor(currentSetupStore.Name)
+            if storeFolder and storeFolder:IsA("Model") and storeFolder.Parent == workspace.Stores then
+                -- Нашли предмет для настройки
+                highlightItem(item, Color3.fromRGB(0, 200, 200))
+                
+                -- Добавляем предмет в список
+                table.insert(allItems, {
+                    Name = item.BoxItemName.Value,
+                    Box = item,
+                    Store = currentSetupStore.Name
+                })
+                
+                -- Помечаем магазин как настроенный
+                currentSetupStore.Configured = true
+                
+                -- Возвращаем игрока на сохраненную позицию
+                teleportPlayer(savedPosition)
+                
+                -- Обновляем статус
+                updateStatus("Магазин "..currentSetupStore.Name.." настроен!", Color3.fromRGB(0, 255, 0))
+                
+                -- Сбрасываем состояние настройки
+                isSettingUp = false
+                currentSetupStore = nil
+                SetupButton.Text = "Настроить магазины"
+                
+                return
             end
         end
-    else
-        filteredItems = allItems
+        item = item.Parent
     end
-    
-    -- Сортируем по алфавиту
-    table.sort(filteredItems, function(a, b) return a.Name < b.Name end)
-    
-    return filteredItems
 end
 
 -- Мгновенная телепортация предмета
@@ -396,127 +419,6 @@ local function purchaseItem(storeName, itemName)
     return true
 end
 
--- Определение ID магазина
-local function determineStoreID(storeName)
-    local storeData
-    for _, data in ipairs(stores) do
-        if data.Name == storeName then
-            storeData = data
-            break
-        end
-    end
-    
-    if not storeData then return false end
-    
-    -- Сохраняем текущую позицию
-    local char = Player.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") then return false end
-    local savedPosition = char.HumanoidRootPart.Position
-    
-    -- Находим стойку
-    local counter = workspace.Stores[storeName]:FindFirstChild("Counter")
-    if not counter then return false end
-    
-    -- Находим пример предмета
-    local sampleItem
-    for _, item in ipairs(allItems) do
-        if item.Name == storeData.SampleItem and item.Store == storeName then
-            sampleItem = item.Box
-            break
-        end
-    end
-    
-    if not sampleItem then return false end
-    
-    -- Создаем GUI для подбора ID
-    local IDGui = Instance.new("ScreenGui")
-    IDGui.Name = "IDFinderGUI"
-    IDGui.Parent = ScreenGui
-    
-    local IDFrame = Instance.new("Frame")
-    IDFrame.Size = UDim2.new(0, 250, 0, 100)
-    IDFrame.Position = UDim2.new(0.5, -125, 0.7, -50)
-    IDFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-    IDFrame.BackgroundTransparency = 0.15
-    IDFrame.Parent = IDGui
-    
-    local IDCorner = Instance.new("UICorner")
-    IDCorner.CornerRadius = UDim.new(0, 8)
-    IDCorner.Parent = IDFrame
-    
-    local IDTitle = Instance.new("TextLabel")
-    IDTitle.Text = "Подбор ID для "..storeName
-    IDTitle.Font = Enum.Font.SourceSansBold
-    IDTitle.TextSize = 18
-    IDTitle.TextColor3 = Color3.new(1, 1, 1)
-    IDTitle.Size = UDim2.new(1, -10, 0, 30)
-    IDTitle.Position = UDim2.new(0, 5, 0, 5)
-    IDTitle.BackgroundTransparency = 1
-    IDTitle.Parent = IDFrame
-    
-    local IDStatus = Instance.new("TextLabel")
-    IDStatus.Text = "Попытка ID: 0"
-    IDStatus.Font = Enum.Font.SourceSans
-    IDStatus.TextSize = 16
-    IDStatus.TextColor3 = Color3.new(0.9, 0.9, 0.9)
-    IDStatus.Size = UDim2.new(1, -10, 0, 30)
-    IDStatus.Position = UDim2.new(0, 5, 0, 35)
-    IDStatus.BackgroundTransparency = 1
-    IDStatus.Parent = IDFrame
-    
-    local IDProgress = Instance.new("TextLabel")
-    IDProgress.Text = "Идет процесс..."
-    IDProgress.Font = Enum.Font.SourceSans
-    IDProgress.TextSize = 14
-    IDProgress.TextColor3 = Color3.new(0.9, 0.9, 0.9)
-    IDProgress.Size = UDim2.new(1, -10, 0, 20)
-    IDProgress.Position = UDim2.new(0, 5, 0, 70)
-    IDProgress.BackgroundTransparency = 1
-    IDProgress.Parent = IDFrame
-    
-    -- Подбор ID
-    local foundID = false
-    local currentID = 0
-    
-    while not foundID and not stopRequested do
-        currentID = currentID + 1
-        IDStatus.Text = "Попытка ID: "..currentID
-        
-        -- Устанавливаем ID
-        _G[storeName.."ID"] = currentID
-        
-        -- Телепортируем предмет к стойке
-        teleportItem(sampleItem, counter.Position + Vector3.new(0, 2, 0))
-        task.wait(0.1)
-        
-        -- Телепортируем игрока к стойке
-        teleportPlayer(counter.Position + Vector3.new(0, 0, -2))
-        task.wait(0.1)
-        
-        -- Пытаемся купить
-        purchaseItem(storeName, storeData.SampleItem)
-        task.wait(0.1)
-        
-        -- Проверяем, купили ли мы предмет
-        local purchased = findPurchasedItem()
-        if purchased then
-            foundID = true
-            renamePurchasedItem(purchased)
-            IDProgress.Text = "Найден ID: "..currentID
-            _G[storeName.."ID"] = currentID
-        end
-    end
-    
-    -- Восстанавливаем позицию
-    teleportPlayer(savedPosition)
-    task.wait(0.5)
-    
-    -- Удаляем GUI
-    IDGui:Destroy()
-    
-    return foundID
-end
-
 -- Автоматическая покупка
 local function autoBuyItems()
     if not selectedItem or not tonumber(QuantityBox.Text) or tonumber(QuantityBox.Text) < 1 then
@@ -552,19 +454,6 @@ local function autoBuyItems()
         StartButton.Visible = true
         StopButton.Visible = false
         return
-    end
-    
-    -- Проверяем ID магазина
-    if _G[selectedItem.Store.."ID"] == -1 then
-        updateStatus("Определяем ID магазина...", Color3.fromRGB(255, 255, 150))
-        local success = determineStoreID(selectedItem.Store)
-        if not success then
-            updateStatus("Не удалось определить ID", Color3.fromRGB(255, 100, 100))
-            isRunning = false
-            StartButton.Visible = true
-            StopButton.Visible = false
-            return
-        end
     end
     
     updateStatus("Начата покупка...", Color3.fromRGB(150, 255, 150))
@@ -618,107 +507,9 @@ local function autoBuyItems()
     StopButton.Visible = false
 end
 
--- Функция для создания выпадающего списка магазинов
-local function createStoreDropdown()
-    -- Удаляем старый дропдаун, если есть
-    local oldDropdown = MainFrame:FindFirstChild("StoreDropdownMenu")
-    if oldDropdown then oldDropdown:Destroy() end
-    
-    -- Создаем новый дропдаун
-    local dropdown = Instance.new("Frame")
-    dropdown.Name = "StoreDropdownMenu"
-    dropdown.Size = UDim2.new(0.9, 0, 0, 150)
-    dropdown.Position = UDim2.new(0.05, 0, 0.2, 30)
-    dropdown.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-    dropdown.Parent = MainFrame
-    
-    local dropdownCorner = Instance.new("UICorner")
-    dropdownCorner.CornerRadius = UDim.new(0, 6)
-    dropdownCorner.Parent = dropdown
-    
-    local scroll = Instance.new("ScrollingFrame")
-    scroll.Size = UDim2.new(1, -5, 1, -5)
-    scroll.Position = UDim2.new(0, 5, 0, 5)
-    scroll.BackgroundTransparency = 1
-    scroll.ScrollBarThickness = 5
-    scroll.Parent = dropdown
-    
-    local layout = Instance.new("UIListLayout")
-    layout.Parent = scroll
-    
-    -- Добавляем "Все магазины"
-    local allButton = Instance.new("TextButton")
-    allButton.Text = "Все магазины"
-    allButton.Size = UDim2.new(1, 0, 0, 30)
-    allButton.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
-    allButton.TextColor3 = Color3.new(1, 1, 1)
-    allButton.Font = Enum.Font.SourceSansSemibold
-    allButton.TextSize = 16
-    allButton.Parent = scroll
-    
-    local allCorner = Instance.new("UICorner")
-    allCorner.CornerRadius = UDim.new(0, 4)
-    allCorner.Parent = allButton
-    
-    allButton.MouseButton1Click:Connect(function()
-        StoreDropdown.Text = "Все магазины"
-        selectedStore = nil
-        populateItemDropdown()
-        dropdown:Destroy()
-    end)
-    
-    -- Добавляем магазины
-    for _, store in ipairs(stores) do
-        local button = Instance.new("TextButton")
-        button.Text = store.Name
-        button.Size = UDim2.new(1, 0, 0, 30)
-        button.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
-        button.TextColor3 = Color3.new(1, 1, 1)
-        button.Font = Enum.Font.SourceSansSemibold
-        button.TextSize = 16
-        button.Parent = scroll
-        
-        local buttonCorner = Instance.new("UICorner")
-        buttonCorner.CornerRadius = UDim.new(0, 4)
-        buttonCorner.Parent = button
-        
-        button.MouseButton1Click:Connect(function()
-            StoreDropdown.Text = store.Name
-            selectedStore = store.Name
-            populateItemDropdown()
-            dropdown:Destroy()
-        end)
-    end
-    
-    -- Закрытие при клике вне меню
-    local connection
-    connection = UserInputService.InputBegan:Connect(function(input, processed)
-        if not processed and input.UserInputType == Enum.UserInputType.MouseButton1 then
-            local mousePos = UserInputService:GetMouseLocation()
-            local absPos = dropdown.AbsolutePosition
-            local absSize = dropdown.AbsoluteSize
-            
-            if not (mousePos.X >= absPos.X and mousePos.X <= absPos.X + absSize.X and
-                   mousePos.Y >= absPos.Y and mousePos.Y <= absPos.Y + absSize.Y) then
-                dropdown:Destroy()
-                connection:Disconnect()
-            end
-        end
-    end)
-end
-
 -- Функция для создания выпадающего списка предметов
 local function createItemDropdown()
     if #allItems == 0 then
-        allItems = scanShopItems()
-        if #allItems == 0 then
-            updateStatus("Не найдено ни одного предмета", Color3.fromRGB(255, 100, 100))
-            return
-        end
-    end
-    
-    local filteredItems = populateItemDropdown()
-    if #filteredItems == 0 then
         updateStatus("Нет доступных предметов", Color3.fromRGB(255, 100, 100))
         return
     end
@@ -727,10 +518,13 @@ local function createItemDropdown()
     local oldDropdown = MainFrame:FindFirstChild("ItemDropdownMenu")
     if oldDropdown then oldDropdown:Destroy() end
     
+    -- Сортируем предметы по алфавиту
+    table.sort(allItems, function(a, b) return a.Name < b.Name end)
+    
     -- Создаем новый дропдаун
     local dropdown = Instance.new("Frame")
     dropdown.Name = "ItemDropdownMenu"
-    dropdown.Size = UDim2.new(0.9, 0, 0, math.min(200, #filteredItems * 30 + 10))
+    dropdown.Size = UDim2.new(0.9, 0, 0, math.min(200, #allItems * 30 + 10))
     dropdown.Position = UDim2.new(0.05, 0, 0.4, 30)
     dropdown.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
     dropdown.Parent = MainFrame
@@ -750,7 +544,7 @@ local function createItemDropdown()
     layout.Parent = scroll
     
     -- Добавляем предметы
-    for _, item in ipairs(filteredItems) do
+    for _, item in ipairs(allItems) do
         local button = Instance.new("TextButton")
         button.Text = item.Name
         button.Size = UDim2.new(1, 0, 0, 30)
@@ -790,7 +584,7 @@ local function createItemDropdown()
 end
 
 -- Обработчики событий
-StoreDropdown.MouseButton1Click:Connect(createStoreDropdown)
+SetupButton.MouseButton1Click:Connect(setupStores)
 ItemDropdown.MouseButton1Click:Connect(createItemDropdown)
 
 StartButton.MouseButton1Click:Connect(function()
@@ -814,10 +608,19 @@ QuantityBox.FocusLost:Connect(function()
     end
 end)
 
+-- Обработчик кликов мыши
+game:GetService("UserInputService").InputBegan:Connect(function(input, processed)
+    if not processed and input.UserInputType == Enum.UserInputType.MouseButton1 and isSettingUp then
+        local target = game:GetService("UserInputService"):GetMouseTarget()
+        if target then
+            handleSetupClick(target)
+        end
+    end
+end)
+
 -- Инициализация
 for _, store in ipairs(stores) do
     _G[store.Name.."ID"] = -1
 end
 
-populateStoreDropdown()
 updateStatus("Готов к работе")
