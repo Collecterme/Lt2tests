@@ -3,6 +3,7 @@ local Player = Players.LocalPlayer
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 
 -- ID магазинов (по умолчанию -1)
 local WoodRUsID = -1
@@ -117,7 +118,7 @@ QuantityBox.Text = "1"
 QuantityBox.Font = Enum.Font.SourceSans
 QuantityBox.TextSize = 16
 QuantityBox.TextColor3 = Color3.new(0, 0, 0)
-QuantityLine.Size = UDim2.new(0.9, 0, 0, 30)
+QuantityBox.Size = UDim2.new(0.9, 0, 0, 30)
 QuantityBox.Position = UDim2.new(0.05, 0, 0.6, 0)
 QuantityBox.BackgroundColor3 = Color3.new(1, 1, 1)
 QuantityBox.Parent = MainFrame
@@ -571,10 +572,15 @@ local function autoBuyItems()
     StopButton.Visible = false
 end
 
--- Обработчики событий
-StoreDropdown.MouseButton1Click:Connect(function()
-    -- Создаем меню выбора магазина
+-- Функция для создания выпадающего списка магазинов
+local function createStoreDropdown()
+    -- Удаляем старый дропдаун, если есть
+    local oldDropdown = MainFrame:FindFirstChild("StoreDropdownMenu")
+    if oldDropdown then oldDropdown:Destroy() end
+    
+    -- Создаем новый дропдаун
     local dropdown = Instance.new("Frame")
+    dropdown.Name = "StoreDropdownMenu"
     dropdown.Size = UDim2.new(0.9, 0, 0, 150)
     dropdown.Position = UDim2.new(0.05, 0, 0.2, 30)
     dropdown.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
@@ -640,9 +646,9 @@ StoreDropdown.MouseButton1Click:Connect(function()
     
     -- Закрытие при клике вне меню
     local connection
-    connection = game:GetService("UserInputService").InputBegan:Connect(function(input, processed)
+    connection = UserInputService.InputBegan:Connect(function(input, processed)
         if not processed and input.UserInputType == Enum.UserInputType.MouseButton1 then
-            local mousePos = game:GetService("UserInputService"):GetMouseLocation()
+            local mousePos = UserInputService:GetMouseLocation()
             local absPos = dropdown.AbsolutePosition
             local absSize = dropdown.AbsoluteSize
             
@@ -653,9 +659,10 @@ StoreDropdown.MouseButton1Click:Connect(function()
             end
         end
     end)
-end)
+end
 
-ItemDropdown.MouseButton1Click:Connect(function()
+-- Функция для создания выпадающего списка предметов
+local function createItemDropdown()
     if #allItems == 0 then
         allItems = scanShopItems()
     end
@@ -666,8 +673,13 @@ ItemDropdown.MouseButton1Click:Connect(function()
         return
     end
     
-    -- Создаем меню выбора предмета
+    -- Удаляем старый дропдаун, если есть
+    local oldDropdown = MainFrame:FindFirstChild("ItemDropdownMenu")
+    if oldDropdown then oldDropdown:Destroy() end
+    
+    -- Создаем новый дропдаун
     local dropdown = Instance.new("Frame")
+    dropdown.Name = "ItemDropdownMenu"
     dropdown.Size = UDim2.new(0.9, 0, 0, math.min(200, #filteredItems * 30 + 10))
     dropdown.Position = UDim2.new(0.05, 0, 0.4, 30)
     dropdown.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
@@ -712,9 +724,9 @@ ItemDropdown.MouseButton1Click:Connect(function()
     
     -- Закрытие при клике вне меню
     local connection
-    connection = game:GetService("UserInputService").InputBegan:Connect(function(input, processed)
+    connection = UserInputService.InputBegan:Connect(function(input, processed)
         if not processed and input.UserInputType == Enum.UserInputType.MouseButton1 then
-            local mousePos = game:GetService("UserInputService"):GetMouseLocation()
+            local mousePos = UserInputService:GetMouseLocation()
             local absPos = dropdown.AbsolutePosition
             local absSize = dropdown.AbsoluteSize
             
@@ -725,7 +737,11 @@ ItemDropdown.MouseButton1Click:Connect(function()
             end
         end
     end)
-end)
+end
+
+-- Обработчики событий
+StoreDropdown.MouseButton1Click:Connect(createStoreDropdown)
+ItemDropdown.MouseButton1Click:Connect(createItemDropdown)
 
 StartButton.MouseButton1Click:Connect(function()
     if not isRunning then
