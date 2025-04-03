@@ -221,7 +221,7 @@ local function getStoreCounters()
     return counters
 end
 
--- Поиск предметов для покупки
+-- Улучшенный поиск предметов для покупки по названиям
 local function scanShopItems()
     local items = {}
     local itemNames = {}
@@ -230,19 +230,24 @@ local function scanShopItems()
     for _, storeFolder in ipairs(workspace.Stores:GetChildren()) do
         local shopItems = storeFolder:FindFirstChild("ShopItems")
         if shopItems then
-            for _, box in ipairs(shopItems:GetChildren()) do
-                if box.Name == "Box" then
-                    local itemName = box:FindFirstChild("BoxItemName")
-                    if itemName and itemName.Value ~= "" and not itemNames[itemName.Value] then
-                        table.insert(items, {
-                            Name = itemName.Value,
-                            Box = box,
-                            Store = storeFolder.Name
-                        })
-                        itemNames[itemName.Value] = true
+            -- Рекурсивный поиск всех BoxItemName в папке ShopItems
+            local function scanRecursive(parent)
+                for _, child in ipairs(parent:GetDescendants()) do
+                    if child.Name == "BoxItemName" and child:IsA("StringValue") and child.Value ~= "" then
+                        local box = child.Parent
+                        if box.Name == "Box" and not itemNames[child.Value] then
+                            table.insert(items, {
+                                Name = child.Value,
+                                Box = box,
+                                Store = storeFolder.Name
+                            })
+                            itemNames[child.Value] = true
+                        end
                     end
                 end
             end
+            
+            scanRecursive(shopItems)
         end
     end
     
@@ -310,7 +315,7 @@ end
 local function findPurchasedItem()
     local playerName = Player.Name
     for _, model in ipairs(workspace.PlayerModels:GetChildren()) do
-        if model.Name == "Box Purchased by "..playerName then
+        if string.find(model.Name, "Box Purchased by "..playerName) then
             return model
         end
     end
@@ -665,6 +670,10 @@ end
 local function createItemDropdown()
     if #allItems == 0 then
         allItems = scanShopItems()
+        if #allItems == 0 then
+            updateStatus("Не найдено ни одного предмета", Color3.fromRGB(255, 100, 100))
+            return
+        end
     end
     
     local filteredItems = populateItemDropdown()
