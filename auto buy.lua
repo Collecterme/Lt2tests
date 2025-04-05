@@ -141,397 +141,281 @@ local function smoothTeleportItem(item, targetPos)
     return true
 end
 
--- Создание GUI
-local ScreenGui = create("ScreenGui", {
-    Name = "AutoBuyGUI",
-    ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-    Parent = game:GetService("CoreGui") or Player:WaitForChild("PlayerGui")
-})
+local Players = game:GetService("Players")
+local Player = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local HttpService = game:GetService("HttpService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
-local MainFrame = create("Frame", {
-    Size = UDim2.new(0, 300, 0, 350),
-    Position = UDim2.new(0.5, -150, 0.5, -175),
-    BackgroundColor3 = Color3.fromRGB(45, 45, 55),
-    BackgroundTransparency = 0.15,
-    Active = true,
-    Parent = ScreenGui
-})
-
-create("UICorner", {
-    CornerRadius = UDim.new(0, 8),
-    Parent = MainFrame
-})
-
--- Заголовок
-local Title = create("TextLabel", {
-    Text = "Auto Buy",
-    Font = Enum.Font.SourceSansBold,
-    TextSize = 18,
-    TextColor3 = Color3.new(1, 1, 1),
-    Size = UDim2.new(1, -10, 0, 30),
-    Position = UDim2.new(0, 5, 0, 5),
-    BackgroundTransparency = 1,
-    Parent = MainFrame
-})
-
--- Выбор магазина
-local StoreSelection = create("TextButton", {
-    Text = "Выберите магазин",
-    Font = Enum.Font.SourceSansSemibold,
-    TextSize = 16,
-    TextColor3 = Color3.new(1, 1, 1),
-    Size = UDim2.new(0.9, 0, 0, 35),
-    Position = UDim2.new(0.05, 0, 0.1, 0),
-    BackgroundColor3 = Color3.fromRGB(70, 120, 200),
-    AutoButtonColor = true,
-    Parent = MainFrame
-})
-
-create("UICorner", {
-    CornerRadius = UDim.new(0, 6),
-    Parent = StoreSelection
-})
-
--- Выбор предмета
-local ItemSelection = create("TextButton", {
-    Text = "Выберите предмет",
-    Font = Enum.Font.SourceSansSemibold,
-    TextSize = 16,
-    TextColor3 = Color3.new(1, 1, 1),
-    Size = UDim2.new(0.9, 0, 0, 35),
-    Position = UDim2.new(0.05, 0, 0.25, 0),
-    BackgroundColor3 = Color3.fromRGB(70, 120, 200),
-    AutoButtonColor = true,
-    Parent = MainFrame
-})
-
-create("UICorner", {
-    CornerRadius = UDim.new(0, 6),
-    Parent = ItemSelection
-})
-
--- Количество
-local QuantityInput = create("TextBox", {
-    Text = "1",
-    Font = Enum.Font.SourceSans,
-    TextSize = 16,
-    TextColor3 = Color3.new(0, 0, 0),
-    Size = UDim2.new(0.9, 0, 0, 30),
-    Position = UDim2.new(0.05, 0, 0.4, 0),
-    BackgroundColor3 = Color3.new(1, 1, 1),
-    PlaceholderText = "Количество",
-    Parent = MainFrame
-})
-
-create("UICorner", {
-    CornerRadius = UDim.new(0, 6),
-    Parent = QuantityInput
-})
-
--- Кнопки управления
-local StartButton = create("TextButton", {
-    Text = "Начать покупку",
-    Font = Enum.Font.SourceSansSemibold,
-    TextSize = 16,
-    TextColor3 = Color3.new(1, 1, 1),
-    Size = UDim2.new(0.9, 0, 0, 35),
-    Position = UDim2.new(0.05, 0, 0.55, 0),
-    BackgroundColor3 = Color3.fromRGB(80, 160, 90),
-    AutoButtonColor = true,
-    Parent = MainFrame
-})
-
-create("UICorner", {
-    CornerRadius = UDim.new(0, 6),
-    Parent = StartButton
-})
-
-local StopButton = create("TextButton", {
-    Text = "Остановить",
-    Font = Enum.Font.SourceSansSemibold,
-    TextSize = 16,
-    TextColor3 = Color3.new(1, 1, 1),
-    Size = UDim2.new(0.9, 0, 0, 35),
-    Position = UDim2.new(0.05, 0, 0.7, 0),
-    BackgroundColor3 = Color3.fromRGB(200, 80, 80),
-    AutoButtonColor = true,
-    Parent = MainFrame
-})
-
-create("UICorner", {
-    CornerRadius = UDim.new(0, 6),
-    Parent = StopButton
-})
-
--- Статус
-local StatusLabel = create("TextLabel", {
-    Text = "Готов к работе",
-    Font = Enum.Font.SourceSans,
-    TextSize = 14,
-    TextColor3 = Color3.new(0.9, 0.9, 0.9),
-    Size = UDim2.new(0.9, 0, 0, 20),
-    Position = UDim2.new(0.05, 0, 0.85, 0),
-    BackgroundTransparency = 1,
-    Parent = MainFrame
-})
-
--- Прогресс
-local ProgressLabel = create("TextLabel", {
-    Text = "Куплено: 0/0",
-    Font = Enum.Font.SourceSans,
-    TextSize = 14,
-    TextColor3 = Color3.new(0.9, 0.9, 0.9),
-    Size = UDim2.new(0.9, 0, 0, 20),
-    Position = UDim2.new(0.05, 0, 0.9, 0),
-    BackgroundTransparency = 1,
-    Parent = MainFrame
-})
-
--- Списки магазинов и предметов
-local StoreList = create("ScrollingFrame", {
-    Size = UDim2.new(0.9, 0, 0, 0),
-    Position = UDim2.new(0.05, 0, 0.1, 35),
-    BackgroundColor3 = Color3.fromRGB(60, 60, 70),
-    ScrollBarThickness = 5,
-    Visible = false,
-    Parent = MainFrame
-})
-
-create("UICorner", {
-    CornerRadius = UDim.new(0, 6),
-    Parent = StoreList
-})
-
-local ItemList = create("ScrollingFrame", {
-    Size = UDim2.new(0.9, 0, 0, 0),
-    Position = UDim2.new(0.05, 0, 0.25, 35),
-    BackgroundColor3 = Color3.fromRGB(60, 60, 70),
-    ScrollBarThickness = 5,
-    Visible = false,
-    Parent = MainFrame
-})
-
-create("UICorner", {
-    CornerRadius = UDim.new(0, 6),
-    Parent = ItemList
-})
-
--- Переменные состояния
-local selectedStore = nil
-local selectedItem = nil
-local isBuying = false
-local stopRequested = false
-local purchasedCount = 0
-local totalToPurchase = 0
-
--- Функции обновления интерфейса
-local function updateStatus(text, color)
-    StatusLabel.Text = text
-    StatusLabel.TextColor3 = color or Color3.new(0.9, 0.9, 0.9)
-end
-
-local function updateProgress()
-    ProgressLabel.Text = string.format("Куплено: %d/%d", purchasedCount, totalToPurchase)
-end
-
-local function toggleStoreList(show)
-    if show then
-        StoreList.Visible = true
-        local tween = TweenService:Create(
-            StoreList,
-            TweenInfo.new(0.3),
-            {Size = UDim2.new(0.9, 0, 0, math.min(200, StoreList.AbsoluteContentSize.Y))}
-        )
-        tween:Play()
-    else
-        local tween = TweenService:Create(
-            StoreList,
-            TweenInfo.new(0.3),
-            {Size = UDim2.new(0.9, 0, 0, 0)}
-        )
-        tween.Completed:Connect(function()
-            StoreList.Visible = false
-        end)
-        tween:Play()
+-- Функция для создания экземпляров с свойствами
+local function Create(instanceType, properties)
+    local instance = Instance.new(instanceType)
+    for property, value in pairs(properties) do
+        instance[property] = value
     end
+    return instance
 end
 
-local function toggleItemList(show)
-    if show then
-        ItemList.Visible = true
-        local tween = TweenService:Create(
-            ItemList,
-            TweenInfo.new(0.3),
-            {Size = UDim2.new(0.9, 0, 0, math.min(200, ItemList.AbsoluteContentSize.Y))}
-        )
-        tween:Play()
-    else
-        local tween = TweenService:Create(
-            ItemList,
-            TweenInfo.new(0.3),
-            {Size = UDim2.new(0.9, 0, 0, 0)}
-        )
-        tween.Completed:Connect(function()
-            ItemList.Visible = false
-        end)
-        tween:Play()
-    end
-end
-
--- Заполнение списка магазинов
-local function populateStoreList()
-    StoreList:ClearAllChildren()
-    
-    local stores = {}
-    for _, data in pairs(itemMarkers) do
-        if not table.find(stores, data.storeName) then
-            table.insert(stores, data.storeName)
-        end
+-- Создаем основной GUI
+local function CreateMainGUI()
+    -- Удаляем старый GUI если существует
+    local coreGui = game:GetService("CoreGui")
+    if coreGui:FindFirstChild("AutoBuyGUI") then
+        coreGui.AutoBuyGUI:Destroy()
     end
     
-    table.sort(stores)
-    
-    local allButton = create("TextButton", {
-        Text = "Все магазины",
-        Size = UDim2.new(1, -10, 0, 30),
-        Position = UDim2.new(0, 5, 0, 5),
-        BackgroundColor3 = Color3.fromRGB(80, 80, 100),
-        Parent = StoreList
+    local playerGui = Player:WaitForChild("PlayerGui")
+    if playerGui:FindFirstChild("AutoBuyGUI") then
+        playerGui.AutoBuyGUI:Destroy()
+    end
+
+    -- Создаем ScreenGui
+    local ScreenGui = Create("ScreenGui", {
+        Name = "AutoBuyGUI",
+        ZIndexBehavior = Enum.ZIndexBehavior.Global,
+        ResetOnSpawn = false
     })
-    
-    create("UICorner", {
-        CornerRadius = UDim.new(0, 4),
-        Parent = allButton
-    })
-    
-    allButton.MouseButton1Click:Connect(function()
-        selectedStore = "All"
-        StoreSelection.Text = "Все магазины"
-        toggleStoreList(false)
+
+    -- Пытаемся разместить в CoreGui, если не получится - в PlayerGui
+    local success, _ = pcall(function()
+        ScreenGui.Parent = coreGui
     end)
     
-    local yOffset = 40
-    for _, storeName in ipairs(stores) do
-        local button = create("TextButton", {
-            Text = storeName,
-            Size = UDim2.new(1, -10, 0, 30),
-            Position = UDim2.new(0, 5, 0, yOffset),
-            BackgroundColor3 = Color3.fromRGB(80, 80, 100),
-            Parent = StoreList
-        })
-        
-        create("UICorner", {
-            CornerRadius = UDim.new(0, 4),
-            Parent = button
-        })
-        
-        button.MouseButton1Click:Connect(function()
-            selectedStore = storeName
-            StoreSelection.Text = storeName
-            toggleStoreList(false)
-        end)
-        
-        yOffset = yOffset + 35
+    if not success then
+        ScreenGui.Parent = playerGui
     end
-    
-    StoreList.CanvasSize = UDim2.new(0, 0, 0, yOffset + 5)
+
+    -- Основной фрейм
+    local MainFrame = Create("Frame", {
+        Name = "MainFrame",
+        Size = UDim2.new(0, 300, 0, 350),
+        Position = UDim2.new(0.5, -150, 0.5, -175),
+        BackgroundColor3 = Color3.fromRGB(45, 45, 55),
+        BackgroundTransparency = 0.15,
+        Active = true,
+        Draggable = true,
+        Parent = ScreenGui
+    })
+
+    Create("UICorner", {
+        CornerRadius = UDim.new(0, 8),
+        Parent = MainFrame
+    })
+
+    -- Заголовок
+    Create("TextLabel", {
+        Name = "Title",
+        Text = "Auto Buy",
+        Font = Enum.Font.SourceSansBold,
+        TextSize = 18,
+        TextColor3 = Color3.new(1, 1, 1),
+        Size = UDim2.new(1, -10, 0, 30),
+        Position = UDim2.new(0, 5, 0, 5),
+        BackgroundTransparency = 1,
+        Parent = MainFrame
+    })
+
+    -- Кнопка выбора магазина
+    local StoreSelection = Create("TextButton", {
+        Name = "StoreSelection",
+        Text = "Выберите магазин",
+        Font = Enum.Font.SourceSansSemibold,
+        TextSize = 16,
+        TextColor3 = Color3.new(1, 1, 1),
+        Size = UDim2.new(0.9, 0, 0, 35),
+        Position = UDim2.new(0.05, 0, 0.1, 0),
+        BackgroundColor3 = Color3.fromRGB(70, 120, 200),
+        AutoButtonColor = true,
+        Parent = MainFrame
+    })
+
+    Create("UICorner", {
+        CornerRadius = UDim.new(0, 6),
+        Parent = StoreSelection
+    })
+
+    -- Кнопка выбора предмета
+    local ItemSelection = Create("TextButton", {
+        Name = "ItemSelection",
+        Text = "Выберите предмет",
+        Font = Enum.Font.SourceSansSemibold,
+        TextSize = 16,
+        TextColor3 = Color3.new(1, 1, 1),
+        Size = UDim2.new(0.9, 0, 0, 35),
+        Position = UDim2.new(0.05, 0, 0.25, 0),
+        BackgroundColor3 = Color3.fromRGB(70, 120, 200),
+        AutoButtonColor = true,
+        Parent = MainFrame
+    })
+
+    Create("UICorner", {
+        CornerRadius = UDim.new(0, 6),
+        Parent = ItemSelection
+    })
+
+    -- Поле ввода количества
+    local QuantityInput = Create("TextBox", {
+        Name = "QuantityInput",
+        Text = "1",
+        Font = Enum.Font.SourceSans,
+        TextSize = 16,
+        TextColor3 = Color3.new(0, 0, 0),
+        Size = UDim2.new(0.9, 0, 0, 30),
+        Position = UDim2.new(0.05, 0, 0.4, 0),
+        BackgroundColor3 = Color3.new(1, 1, 1),
+        PlaceholderText = "Количество",
+        Parent = MainFrame
+    })
+
+    Create("UICorner", {
+        CornerRadius = UDim.new(0, 6),
+        Parent = QuantityInput
+    })
+
+    -- Кнопка начала покупки
+    local StartButton = Create("TextButton", {
+        Name = "StartButton",
+        Text = "Начать покупку",
+        Font = Enum.Font.SourceSansSemibold,
+        TextSize = 16,
+        TextColor3 = Color3.new(1, 1, 1),
+        Size = UDim2.new(0.9, 0, 0, 35),
+        Position = UDim2.new(0.05, 0, 0.55, 0),
+        BackgroundColor3 = Color3.fromRGB(80, 160, 90),
+        AutoButtonColor = true,
+        Parent = MainFrame
+    })
+
+    Create("UICorner", {
+        CornerRadius = UDim.new(0, 6),
+        Parent = StartButton
+    })
+
+    -- Кнопка остановки
+    local StopButton = Create("TextButton", {
+        Name = "StopButton",
+        Text = "Остановить",
+        Font = Enum.Font.SourceSansSemibold,
+        TextSize = 16,
+        TextColor3 = Color3.new(1, 1, 1),
+        Size = UDim2.new(0.9, 0, 0, 35),
+        Position = UDim2.new(0.05, 0, 0.7, 0),
+        BackgroundColor3 = Color3.fromRGB(200, 80, 80),
+        AutoButtonColor = true,
+        Parent = MainFrame
+    })
+
+    Create("UICorner", {
+        CornerRadius = UDim.new(0, 6),
+        Parent = StopButton
+    })
+
+    -- Статус
+    local StatusLabel = Create("TextLabel", {
+        Name = "StatusLabel",
+        Text = "Готов к работе",
+        Font = Enum.Font.SourceSans,
+        TextSize = 14,
+        TextColor3 = Color3.new(0.9, 0.9, 0.9),
+        Size = UDim2.new(0.9, 0, 0, 20),
+        Position = UDim2.new(0.05, 0, 0.85, 0),
+        BackgroundTransparency = 1,
+        Parent = MainFrame
+    })
+
+    -- Прогресс
+    local ProgressLabel = Create("TextLabel", {
+        Name = "ProgressLabel",
+        Text = "Куплено: 0/0",
+        Font = Enum.Font.SourceSans,
+        TextSize = 14,
+        TextColor3 = Color3.new(0.9, 0.9, 0.9),
+        Size = UDim2.new(0.9, 0, 0, 20),
+        Position = UDim2.new(0.05, 0, 0.9, 0),
+        BackgroundTransparency = 1,
+        Parent = MainFrame
+    })
+
+    -- Список магазинов (изначально скрыт)
+    local StoreList = Create("ScrollingFrame", {
+        Name = "StoreList",
+        Size = UDim2.new(0.9, 0, 0, 0),
+        Position = UDim2.new(0.05, 0, 0.1, 35),
+        BackgroundColor3 = Color3.fromRGB(60, 60, 70),
+        ScrollBarThickness = 5,
+        Visible = false,
+        Parent = MainFrame
+    })
+
+    Create("UICorner", {
+        CornerRadius = UDim.new(0, 6),
+        Parent = StoreList
+    })
+
+    -- Список предметов (изначально скрыт)
+    local ItemList = Create("ScrollingFrame", {
+        Name = "ItemList",
+        Size = UDim2.new(0.9, 0, 0, 0),
+        Position = UDim2.new(0.05, 0, 0.25, 35),
+        BackgroundColor3 = Color3.fromRGB(60, 60, 70),
+        ScrollBarThickness = 5,
+        Visible = false,
+        Parent = MainFrame
+    })
+
+    Create("UICorner", {
+        CornerRadius = UDim.new(0, 6),
+        Parent = ItemList
+    })
+
+    -- UIListLayout для списков
+    local function CreateListLayout(parent)
+        Create("UIListLayout", {
+            Padding = UDim.new(0, 5),
+            SortOrder = Enum.SortOrder.LayoutOrder,
+            Parent = parent
+        })
+        
+        Create("UIPadding", {
+            PaddingTop = UDim.new(0, 5),
+            PaddingLeft = UDim.new(0, 5),
+            PaddingRight = UDim.new(0, 5),
+            Parent = parent
+        })
+    end
+
+    CreateListLayout(StoreList)
+    CreateListLayout(ItemList)
+
+    -- Возвращаем созданные элементы
+    return {
+        ScreenGui = ScreenGui,
+        MainFrame = MainFrame,
+        StoreSelection = StoreSelection,
+        ItemSelection = ItemSelection,
+        QuantityInput = QuantityInput,
+        StartButton = StartButton,
+        StopButton = StopButton,
+        StatusLabel = StatusLabel,
+        ProgressLabel = ProgressLabel,
+        StoreList = StoreList,
+        ItemList = ItemList
+    }
 end
 
--- Заполнение списка предметов
-local function populateItemList()
-    ItemList:ClearAllChildren()
-    
-    if not selectedStore then return end
-    
-    local items = {}
-    for markerName, data in pairs(itemMarkers) do
-        if selectedStore == "All" or data.storeName == selectedStore then
-            if not table.find(items, data.itemName) then
-                table.insert(items, data.itemName)
-            end
-        end
-    end
-    
-    table.sort(items)
-    
-    local yOffset = 5
-    for _, itemName in ipairs(items) do
-        local button = create("TextButton", {
-            Text = itemName,
-            Size = UDim2.new(1, -10, 0, 30),
-            Position = UDim2.new(0, 5, 0, yOffset),
-            BackgroundColor3 = Color3.fromRGB(80, 80, 100),
-            Parent = ItemList
-        })
-        
-        create("UICorner", {
-            CornerRadius = UDim.new(0, 4),
-            Parent = button
-        })
-        
-        button.MouseButton1Click:Connect(function()
-            selectedItem = itemName
-            ItemSelection.Text = itemName
-            toggleItemList(false)
-        end)
-        
-        yOffset = yOffset + 35
-    end
-    
-    ItemList.CanvasSize = UDim2.new(0, 0, 0, yOffset + 5)
-end
+-- Создаем GUI при запуске скрипта
+local GUI = CreateMainGUI()
 
--- Обработчики событий
-StoreSelection.MouseButton1Click:Connect(function()
-    if StoreList.Visible then
-        toggleStoreList(false)
-    else
-        populateStoreList()
-        toggleStoreList(true)
-        if ItemList.Visible then
-            toggleItemList(false)
-        end
-    end
-end)
+-- Проверяем видимость
+GUI.ScreenGui.Enabled = true
+GUI.MainFrame.Visible = true
 
-ItemSelection.MouseButton1Click:Connect(function()
-    if not selectedStore then
-        updateStatus("Сначала выберите магазин", Color3.fromRGB(255, 100, 100))
-        return
-    end
-    
-    if ItemList.Visible then
-        toggleItemList(false)
-    else
-        populateItemList()
-        toggleItemList(true)
-        if StoreList.Visible then
-            toggleStoreList(false)
-        end
-    end
-end)
+print("GUI успешно создан и отображен")
 
--- Поддержка мобильных устройств
-UserInputService.TouchStarted:Connect(function(touch, gameProcessed)
-    if gameProcessed then return end
-    
-    local touchPos = touch.Position
-    local storeAbsPos = StoreSelection.AbsolutePosition
-    local storeAbsSize = StoreSelection.AbsoluteSize
-    
-    if touchPos.X >= storeAbsPos.X and touchPos.X <= storeAbsPos.X + storeAbsSize.X and
-       touchPos.Y >= storeAbsPos.Y and touchPos.Y <= storeAbsPos.Y + storeAbsSize.Y then
-        StoreSelection.MouseButton1Click:Fire()
-    end
-    
-    local itemAbsPos = ItemSelection.AbsolutePosition
-    local itemAbsSize = ItemSelection.AbsoluteSize
-    
-    if touchPos.X >= itemAbsPos.X and touchPos.X <= itemAbsPos.X + itemAbsSize.X and
-       touchPos.Y >= itemAbsPos.Y and touchPos.Y <= itemAbsPos.Y + itemAbsSize.Y then
-        ItemSelection.MouseButton1Click:Fire()
-    end
-end)
+-- Добавляем в глобальное пространство для доступа из консоли
+_G.ToggleAutoBuyGUI = ToggleGUI
 
 -- Функции для покупки
 local function getCounterPosition(storeName)
